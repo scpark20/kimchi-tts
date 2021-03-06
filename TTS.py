@@ -246,7 +246,7 @@ class TTSMelDecoder(nn.Module):
         for decoder_blocks, up, cond in zip(self.decoder_blocks_list, self.ups, conds):
             if x is not None:
                 x = up(x)
-            x, kl_div = decoder_blocks.inference(x, cond, temperature)
+            x = decoder_blocks.inference(x, cond, temperature)
         x = self.out(x)
         
         return x
@@ -322,7 +322,7 @@ class TTSModel(nn.Module):
         
         mean = (params[:, :, 0:1].exp() * self.hp.mean_coeff).cumsum(dim=1)
         if mel_length is None:
-            mel_length = torch.max(mean).item()
+            mel_length = torch.max(mean).long().item()
         scale = params[:, :, 1:2].exp() * self.hp.scale_coeff
         Z = torch.sqrt(2 * np.pi * scale ** 2)
         matrix = torch.linspace(0, mel_length-1, mel_length, device=params.device).repeat(batch, text_length, 1)
@@ -376,7 +376,7 @@ class TTSModel(nn.Module):
         
         return outputs
         
-    def inference(self, cond, alignments=None, mel_length=None, temperature=1.0):
+    def inference(self, cond, mel_length=None, alignments=None, temperature=1.0):
         # cond : (b, l)
         
         # (b, c, l)
@@ -385,7 +385,8 @@ class TTSModel(nn.Module):
         params = self.text_encoder.inference(cond)
         
         if alignments is None:
-            alignments = self._normalize(self._get_attention_matrix(params, mel_length))
+            alignments = self._get_attention_matrix(params, mel_length)
+        alignments = self._normalize(alignments)
         
         # Pad
         pad_length = ((alignments.size(2)-1)//self.length_unit+1) * self.length_unit-alignments.size(2)

@@ -8,6 +8,7 @@ from os.path import isfile, join
 import ntpath
 from torch.utils.data import DataLoader
 import warnings
+import pytorch_lightning as pl
 
 def logmelfilterbank(audio,
                      sampling_rate,
@@ -77,6 +78,7 @@ class LJDataset(torch.utils.data.Dataset):
         with warnings.catch_warnings():
             mel = logmelfilterbank(wav, sampling_rate=22050, fft_size=1024, hop_size=256, fmin=80, fmax=7600)
 
+        mel = (mel + 5) / 5
         return mel
     
     def _get_utf8_values(self, text):
@@ -134,7 +136,7 @@ class TextMelCollate():
         max_target_len = max([x[1].shape[1] for x in batch])
         #max_target_len = 1024
         mel_padded = torch.FloatTensor(len(batch), num_mels, max_target_len)
-        mel_padded.fill_(-5)
+        mel_padded.fill_(0)
         output_lengths = torch.LongTensor(len(batch))
         for i in range(len(ids_sorted_decreasing)):
             mel = batch[ids_sorted_decreasing[i]][1]
@@ -145,3 +147,19 @@ class TextMelCollate():
         outputs['mel_lengths'] = output_lengths
 
         return outputs
+    
+class LJDataModule(pl.LightningDataModule):
+    def __init__(self, hp):
+        super().__init__()
+        self.hp = hp
+        
+    def setup(self, stage=None):
+        self.train_dataset = LJDataset(self.hp.root_dir)
+        self.collate_fn = TextMelCollate()
+        
+    def train_dataloader(self):
+        return torch.utils.data.DataLoader(self.train_dataset,
+                                           batch_size=self.hp.batch_size,
+                                           num_workers=self.hp.num_workers,
+                                           shuffle=True,
+                                           collate_fn=self.collate_fn)
