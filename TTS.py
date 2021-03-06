@@ -100,23 +100,25 @@ class ConvBlock(nn.Module):
                                       Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
                                       nn.BatchNorm1d(hidden_channels),
                                       nn.GELU(),
-                                      Conv1d(hidden_channels, in_channels)
+                                      Conv1d(hidden_channels, out_channels)
                                      )
         if type == 1:
-            self.conv = nn.Sequential(Conv1d(in_channels, hidden_channels),
+            self.conv = nn.Sequential(Conv1d(in_channels, hidden_channels, kernel_size=3, padding=1),
                                       nn.BatchNorm1d(hidden_channels),
                                       nn.GELU(),
                                       Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
                                       nn.BatchNorm1d(hidden_channels),
                                       nn.GELU(),
-                                      Conv1d(hidden_channels, in_channels)
+                                      Conv1d(hidden_channels, out_channels)
                                      )    
         if type == 2:
             self.conv = nn.Sequential(Conv1d(in_channels, hidden_channels, kernel_size=3, padding=1),
                                       nn.BatchNorm1d(hidden_channels),
                                       nn.GELU(),
-                                      Conv1d(hidden_channels, in_channels)
+                                      Conv1d(hidden_channels, out_channels)
                                      )        
+        if type == 3:
+            self.conv = Conv1d(in_channels, out_channels, kernel_size=3, padding=1)           
         
     def forward(self, x):
         x = self.conv(x)
@@ -165,7 +167,7 @@ class TTSMelDecoderBlock(nn.Module):
         super().__init__()
         
         self.hp = hp
-        self.q = ConvBlock(hp.dec_dim + hp.enc_dim, hp.dec_hidden_dim, hp.z_dim, last_zero=True, type=hp.conv_type)
+        self.q = ConvBlock(hp.dec_dim + hp.enc_dim, hp.dec_hidden_dim, hp.z_dim*2, last_zero=True, type=hp.conv_type)
         self.z_proj = Conv1d(hp.z_dim, hp.dec_dim)
         self.out = ConvBlock(hp.dec_dim, hp.dec_hidden_dim, hp.dec_dim, type=hp.conv_type)
         
