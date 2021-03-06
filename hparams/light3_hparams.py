@@ -11,7 +11,7 @@ def create_hparams():
                    scale_coeff = 8,
         
                    # Training Params
-                   root_dir='/data/datasets/LJSpeech-1.1/',
+                   root_dir='/home/scpark/hard/datasets/LJSpeech-1.1/',
                    batch_size=32,
                    num_workers=1,
                    annealing_steps=50000,
@@ -54,6 +54,7 @@ def create_hparams():
                     dec_dim = 128,
                     dec_hidden_dim = 128,
                     z_dim = 16,
+                    conv_type = 0
                    )
 
     return stt_hparams, tts_hparams

@@ -54,6 +54,7 @@ def create_hparams():
                     dec_dim = 128,
                     dec_hidden_dim = 128,
                     z_dim = 16,
+                    conv_type = 0
                    )
 
     return stt_hparams, tts_hparams

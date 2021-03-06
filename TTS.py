@@ -87,20 +87,36 @@ class TTSTextEncoder(nn.Module):
         return params
     
 class ConvBlock(nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels, last_zero=False):
+    def __init__(self, in_channels, hidden_channels, out_channels, last_zero=False, type=0):
         super().__init__()
-        
-        self.conv = nn.Sequential(Conv1d(in_channels, hidden_channels),
-                                  nn.BatchNorm1d(hidden_channels),
-                                  nn.GELU(),
-                                  Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
-                                  nn.BatchNorm1d(hidden_channels),
-                                  nn.GELU(),
-                                  Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
-                                  nn.BatchNorm1d(hidden_channels),
-                                  nn.GELU(),
-                                  Conv1d(hidden_channels, in_channels)
-                                 )
+            
+        if type == 0:
+            self.conv = nn.Sequential(Conv1d(in_channels, hidden_channels),
+                                      nn.BatchNorm1d(hidden_channels),
+                                      nn.GELU(),
+                                      Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
+                                      nn.BatchNorm1d(hidden_channels),
+                                      nn.GELU(),
+                                      Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
+                                      nn.BatchNorm1d(hidden_channels),
+                                      nn.GELU(),
+                                      Conv1d(hidden_channels, in_channels)
+                                     )
+        if type == 1:
+            self.conv = nn.Sequential(Conv1d(in_channels, hidden_channels),
+                                      nn.BatchNorm1d(hidden_channels),
+                                      nn.GELU(),
+                                      Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
+                                      nn.BatchNorm1d(hidden_channels),
+                                      nn.GELU(),
+                                      Conv1d(hidden_channels, in_channels)
+                                     )    
+        if type == 2:
+            self.conv = nn.Sequential(Conv1d(in_channels, hidden_channels, kernel_size=3, padding=1),
+                                      nn.BatchNorm1d(hidden_channels),
+                                      nn.GELU(),
+                                      Conv1d(hidden_channels, in_channels)
+                                     )        
         
     def forward(self, x):
         x = self.conv(x)
@@ -111,7 +127,8 @@ class TTSMelEncoderBlocks(nn.Module):
     def __init__(self, hp):
         super().__init__()
         
-        self.convs = nn.ModuleList([ConvBlock(hp.enc_dim, hp.enc_hidden_dim, hp.enc_dim) for _ in range(hp.n_blocks)])
+        self.convs = nn.ModuleList([ConvBlock(hp.enc_dim, hp.enc_hidden_dim, hp.enc_dim, type=hp.conv_type) \
+                                    for _ in range(hp.n_blocks)])
         
     def forward(self, x):
         xs = []
@@ -148,9 +165,9 @@ class TTSMelDecoderBlock(nn.Module):
         super().__init__()
         
         self.hp = hp
-        self.q = ConvBlock(hp.dec_dim + hp.enc_dim, hp.dec_hidden_dim, hp.z_dim, last_zero=True)
+        self.q = ConvBlock(hp.dec_dim + hp.enc_dim, hp.dec_hidden_dim, hp.z_dim, last_zero=True, type=hp.conv_type)
         self.z_proj = Conv1d(hp.z_dim, hp.dec_dim)
-        self.out = ConvBlock(hp.dec_dim, hp.dec_hidden_dim, hp.dec_dim)
+        self.out = ConvBlock(hp.dec_dim, hp.dec_hidden_dim, hp.dec_dim, type=hp.conv_type)
         
     def _get_kl_div(self, q_params):
         p_mean = 0
