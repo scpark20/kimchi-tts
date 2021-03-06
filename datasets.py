@@ -8,7 +8,7 @@ from os.path import isfile, join
 import ntpath
 from torch.utils.data import DataLoader
 import warnings
-import pytorch_lightning as pl
+#import pytorch_lightning as pl
 
 def logmelfilterbank(audio,
                      sampling_rate,
@@ -148,18 +148,18 @@ class TextMelCollate():
 
         return outputs
     
-class LJDataModule(pl.LightningDataModule):
-    def __init__(self, hp):
-        super().__init__()
-        self.hp = hp
+# class LJDataModule(pl.LightningDataModule):
+#     def __init__(self, hp):
+#         super().__init__()
+#         self.hp = hp
         
-    def setup(self, stage=None):
-        self.train_dataset = LJDataset(self.hp.root_dir)
-        self.collate_fn = TextMelCollate()
+#     def setup(self, stage=None):
+#         self.train_dataset = LJDataset(self.hp.root_dir)
+#         self.collate_fn = TextMelCollate()
         
-    def train_dataloader(self):
-        return torch.utils.data.DataLoader(self.train_dataset,
-                                           batch_size=self.hp.batch_size,
-                                           num_workers=self.hp.num_workers,
-                                           shuffle=True,
-                                           collate_fn=self.collate_fn)
+#     def train_dataloader(self):
+#         return torch.utils.data.DataLoader(self.train_dataset,
+#                                            batch_size=self.hp.batch_size,
+#                                            num_workers=self.hp.num_workers,
+#                                            shuffle=True,
+#                                            collate_fn=self.collate_fn)

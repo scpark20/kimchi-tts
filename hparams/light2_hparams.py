@@ -11,7 +11,7 @@ def create_hparams():
                    scale_coeff = 8,
         
                    # Training Params
-                   root_dir='/home/scpark/hard/datasets/LJSpeech-1.1/',
+                   root_dir='/data/datasets/LJSpeech-1.1/',
                    batch_size=32,
                    num_workers=1,
                    annealing_steps=50000,

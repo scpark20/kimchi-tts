@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-import pytorch_lightning as pl
+#import pytorch_lightning as pl
 
 from STT import STTModel
 from TTS import TTSModel
@@ -49,29 +49,29 @@ class Model(nn.Module):
 '''
 Pytorch-Lightning Wrapping Model
 '''
-class LightningModel(pl.LightningModule):
-    def __init__(self, stt_hparams, tts_hparams):
-        super().__init__()
-        self.hp = tts_hparams
-        self.model = Model(stt_hparams, tts_hparams)
-        self.save_hyperparameters()
+# class LightningModel(pl.LightningModule):
+#     def __init__(self, stt_hparams, tts_hparams):
+#         super().__init__()
+#         self.hp = tts_hparams
+#         self.model = Model(stt_hparams, tts_hparams)
+#         self.save_hyperparameters()
         
-    def training_step(self, batch, batch_idx):
-        stt_outputs, tts_outputs = self.model(batch)
-        self.stt_outputs = stt_outputs
-        self.tts_outputs = tts_outputs
-        self.model.increase_step()
-        loss = stt_outputs['loss'] + tts_outputs['loss']
+#     def training_step(self, batch, batch_idx):
+#         stt_outputs, tts_outputs = self.model(batch)
+#         self.stt_outputs = stt_outputs
+#         self.tts_outputs = tts_outputs
+#         self.model.increase_step()
+#         loss = stt_outputs['loss'] + tts_outputs['loss']
         
-        self.log('loss', loss, on_step=True, on_epoch=False, prog_bar=True, logger=True)
-        self.log('stt', stt_outputs['loss'], on_step=True, on_epoch=False, prog_bar=True, logger=True)
-        self.log('recon', tts_outputs['recon_loss'], on_step=True, on_epoch=False, prog_bar=True, logger=True)
-        self.log('kl', tts_outputs['kl_loss'], on_step=True, on_epoch=False, prog_bar=True, logger=True)
-        self.log('param', tts_outputs['param_loss'], on_step=True, on_epoch=False, prog_bar=True, logger=True)
-        self.log('beta', self.model.beta, on_step=True, on_epoch=False, prog_bar=True, logger=True)
+#         self.log('loss', loss, on_step=True, on_epoch=False, prog_bar=True, logger=True)
+#         self.log('stt', stt_outputs['loss'], on_step=True, on_epoch=False, prog_bar=True, logger=True)
+#         self.log('recon', tts_outputs['recon_loss'], on_step=True, on_epoch=False, prog_bar=True, logger=True)
+#         self.log('kl', tts_outputs['kl_loss'], on_step=True, on_epoch=False, prog_bar=True, logger=True)
+#         self.log('param', tts_outputs['param_loss'], on_step=True, on_epoch=False, prog_bar=True, logger=True)
+#         self.log('beta', self.model.beta, on_step=True, on_epoch=False, prog_bar=True, logger=True)
         
-        return loss
+#         return loss
         
-    def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.hp.lr, weight_decay=self.hp.weight_decay)
-        return optimizer
+#     def configure_optimizers(self):
+#         optimizer = torch.optim.Adam(self.parameters(), lr=self.hp.lr, weight_decay=self.hp.weight_decay)
+#         return optimizer
