@@ -4,7 +4,8 @@ from torch import nn
 from torch.nn import functional as F
 
 class Conv1d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=True, zero_weight=False):
+    def __init__(self, in_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=True, 
+                 zero_weight=False, weight_norm=False):
         super().__init__()
         
         self.conv = nn.Conv1d(in_channels, out_channels, kernel_size, stride, padding, bias=bias)
@@ -12,6 +13,9 @@ class Conv1d(nn.Module):
             self.conv.weight.data.zero_()
         else:
             self.conv.weight.data.normal_(0, 0.02)
+            
+        if weight_norm:
+            self.conv = nn.utils.weight_norm(self.conv)
     
     def forward(self, x):
         # x : (b, c, t)
@@ -86,6 +90,30 @@ class TTSTextEncoder(nn.Module):
         
         return params
     
+class Swish(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.sigmoid = nn.Sigmoid()
+        
+    def forward(self, x):
+        y = x * self.sigmoid(x)
+        
+        return y
+    
+class SELayer(nn.Module):
+    def __init__(self, in_channels):
+        super().__init__()
+        self.conv = nn.Sequential(Conv1d(in_channels, in_channels),
+                                  nn.Sigmoid())
+        
+    def forward(self, x):
+        # x : (b, c, t)
+        y = x.mean(dim=2, keepdim=True)
+        y = self.conv(y)
+        y = x * y
+        
+        return y
+        
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels, last_zero=False, type=0):
         super().__init__()
@@ -118,7 +146,71 @@ class ConvBlock(nn.Module):
                                       Conv1d(hidden_channels, out_channels)
                                      )        
         if type == 3:
-            self.conv = Conv1d(in_channels, out_channels, kernel_size=3, padding=1)           
+            self.conv = Conv1d(in_channels, out_channels, kernel_size=3, padding=1)
+        
+        if type == 4:
+            self.conv = nn.Sequential(Conv1d(in_channels, hidden_channels, weight_norm=True),
+                                      nn.GELU(),
+                                      Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1, weight_norm=True),
+                                      nn.GELU(),
+                                      Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1, weight_norm=True),
+                                      nn.GELU(),
+                                      Conv1d(hidden_channels, out_channels, weight_norm=True)
+                                     )    
+        if type == 5:
+            self.conv = nn.Sequential(nn.BatchNorm1d(in_channels),
+                                      Conv1d(in_channels, hidden_channels),
+                                      nn.BatchNorm1d(hidden_channels),
+                                      Swish(),
+                                      Conv1d(hidden_channels, hidden_channels, kernel_size=5, padding=2),
+                                      nn.BatchNorm1d(hidden_channels),
+                                      Swish(),
+                                      Conv1d(hidden_channels, out_channels),
+                                      #nn.BatchNorm1d(out_channels),
+                                      #SELayer(out_channels)
+                                     )
+            
+        if type == 6:
+            self.conv = nn.Sequential(Conv1d(in_channels, hidden_channels),
+                                      nn.BatchNorm1d(hidden_channels),
+                                      nn.GELU(),
+                                      Conv1d(hidden_channels, hidden_channels, kernel_size=5, padding=2),
+                                      nn.BatchNorm1d(hidden_channels),
+                                      nn.GELU(),
+                                      Conv1d(hidden_channels, hidden_channels, kernel_size=5, padding=2),
+                                      nn.BatchNorm1d(hidden_channels),
+                                      nn.GELU(),
+                                      Conv1d(hidden_channels, out_channels)
+                                     )  
+            
+        if type == 7:
+            self.conv = nn.Sequential(Conv1d(in_channels, hidden_channels),
+                                      nn.BatchNorm1d(hidden_channels),
+                                      Swish(),
+                                      Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
+                                      nn.BatchNorm1d(hidden_channels),
+                                      Swish(),
+                                      Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
+                                      nn.BatchNorm1d(hidden_channels),
+                                      Swish(),
+                                      Conv1d(hidden_channels, out_channels)
+                                     )    
+            
+        if type == 8:
+            self.conv = nn.Sequential(Conv1d(in_channels, hidden_channels),
+                                      nn.BatchNorm1d(hidden_channels),
+                                      nn.GELU(),
+                                      Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
+                                      nn.BatchNorm1d(hidden_channels),
+                                      nn.GELU(),
+                                      Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
+                                      nn.BatchNorm1d(hidden_channels),
+                                      nn.GELU(),
+                                      Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
+                                      nn.BatchNorm1d(hidden_channels),
+                                      nn.GELU(),
+                                      Conv1d(hidden_channels, out_channels)
+                                     )    
         
     def forward(self, x):
         x = self.conv(x)
@@ -129,13 +221,17 @@ class TTSMelEncoderBlocks(nn.Module):
     def __init__(self, hp):
         super().__init__()
         
+        self.hp = hp
         self.convs = nn.ModuleList([ConvBlock(hp.enc_dim, hp.enc_hidden_dim, hp.enc_dim, type=hp.conv_type) \
                                     for _ in range(hp.n_blocks)])
         
     def forward(self, x):
         xs = []
         for conv in self.convs:
-            x = x + conv(x)
+            if self.hp.encoder_residual:
+                x = x + conv(x)
+            else:
+                x = conv(x)
             xs.append(x)
         xs.reverse()
         
@@ -201,7 +297,11 @@ class TTSMelDecoderBlock(nn.Module):
         kl_div = self._get_kl_div(q_params)
         z = self._sample_from_q(q_params)
         z = self.z_proj(z)
-        y = x + self.out(y + z)
+        
+        if self.hp.decoder_residual:
+            y = x + self.out(y + z)
+        else:
+            y = self.out(y + z)
         
         return y, kl_div
     
@@ -214,6 +314,11 @@ class TTSMelDecoderBlock(nn.Module):
         z = self._sample_from_p(x, (x.size(0), self.hp.z_dim, x.size(2)), temperature)
         z = self.z_proj(z)
         y = x + self.out(y + z)
+        
+        if self.hp.decoder_residual:
+            y = x + self.out(y + z)
+        else:
+            y = self.out(y + z)
         
         return y
         
