@@ -41,7 +41,7 @@ class TTSTextEncoder(nn.Module):
         
         self.convs = nn.ModuleList()
         for i in range(hp.text_encoder_n_convs):
-            conv = nn.Sequential(nn.Conv1d(hp.text_encoder_dim if i > 0 else hp.embedding_dim,
+            conv = nn.Sequential(nn.Conv1d(hp.text_encoder_dim if i > 0 else hp.dec_dim,
                                            hp.text_encoder_dim,
                                            kernel_size=hp.text_encoder_kernel_size, 
                                            padding=(hp.text_encoder_kernel_size-1)//2),
