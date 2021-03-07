@@ -313,7 +313,6 @@ class TTSMelDecoderBlock(nn.Module):
 
         z = self._sample_from_p(x, (x.size(0), self.hp.z_dim, x.size(2)), temperature)
         z = self.z_proj(z)
-        y = x + self.out(y + z)
         
         if self.hp.decoder_residual:
             y = x + self.out(y + z)
