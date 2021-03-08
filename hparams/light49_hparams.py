@@ -33,8 +33,8 @@ def create_hparams():
         
                    # STT Decoder params
                    prenet_dim = 128,
-                   attention_rnn_dim = 256,
-                   decoder_rnn_dim = 256,
+                   attention_rnn_dim = 128,
+                   decoder_rnn_dim = 128,
                    p_attention_dropout = 0.1,
                    p_decoder_dropout = 0.1,
         
@@ -51,18 +51,18 @@ def create_hparams():
                     
                     # TTSMelEncoder&Decoder params
                     n_layers = 4,
-                    n_blocks = 4,
-                    enc_dim = 128,
-                    enc_hidden_dim = 128,
-                    dec_dim = 128,
-                    dec_hidden_dim = 128,
+                    n_blocks = 1,
+                    enc_dim = 512,
+                    enc_hidden_dim = 512,
+                    dec_dim = 512,
+                    dec_hidden_dim = 512,
                     z_dim = 16,
                     conv_type = 8,
                     encoder_residual = True,
                     decoder_residual = True,
                     decoder_expand_dim = False,
                     z_proj = False,
-                    enc_add = False
+                    enc_add = True
                    )
 
     return stt_hparams, tts_hparams
