@@ -40,6 +40,7 @@ class TTSTextEncoder(nn.Module):
     def __init__(self, hp):
         super().__init__()
         
+        self.hp = hp
         self.convs = nn.ModuleList()
         for i in range(hp.text_encoder_n_convs):
             conv = nn.Sequential(nn.Conv1d(hp.text_encoder_dim if i > 0 else hp.dec_dim,
@@ -53,6 +54,9 @@ class TTSTextEncoder(nn.Module):
                              hp.text_encoder_dim//2,
                              batch_first=True,
                              bidirectional=True)
+        
+        if hp.enc_add:
+            self.enc_linear = nn.Linear(hp.text_encoder_dim, hp.dec_dim)
         
         self.param_linear = nn.Linear(hp.text_encoder_dim, 2)
         self.param_linear.weight.data.zero_()
@@ -75,7 +79,11 @@ class TTSTextEncoder(nn.Module):
         # (b, l, 2)
         params = self.param_linear(x)
         
-        return params
+        if self.hp.enc_add:
+            encoded = self.enc_linear(x)
+            return encoded, params
+        else:
+            return params
     
     def inference(self, x, time_dict):
         
@@ -97,7 +105,11 @@ class TTSTextEncoder(nn.Module):
         # (b, l, 2)
         params = self.param_linear(x)
         
-        return params
+        if self.hp.enc_add:
+            encoded = self.enc_linear(x)
+            return encoded, params
+        else:
+            return params
     
 class Swish(nn.Module):
     def __init__(self):
@@ -538,7 +550,11 @@ class TTSModel(nn.Module):
         # (b, c, l)
         cond = self.embedding(cond).transpose(1, 2)
         # (b, l, 2)
-        params = self.text_encoder(cond, batch['text_lengths'])
+        if self.hp.enc_add:
+            encoded, params = self.text_encoder(cond, batch['text_lengths'])
+            cond = cond + encoded.transpose(1, 2)
+        else:
+            params = self.text_encoder(cond, batch['text_lengths'])
         # (b, c, t)
         alignments = self._normalize(self._get_attention_matrix(params, x.size(2)))
         # (b, c, t)
@@ -585,7 +601,11 @@ class TTSModel(nn.Module):
         # (b, c, l)
         cond = self.embedding(cond).transpose(1, 2)
         # (b, l, 2)
-        params = self.text_encoder.inference(cond, time_dict)
+        if self.hp.enc_add:
+            encoded, params = self.text_encoder.inference(cond, time_dict)
+            cond = cond + encoded.transpose(1, 2)
+        else:
+            params = self.text_encoder.inference(cond, time_dict)
         t1 = time.time()
         time_dict['encode'] = t1 - t0
         

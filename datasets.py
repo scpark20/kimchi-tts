@@ -114,9 +114,10 @@ class LJDataset(torch.utils.data.Dataset):
         
     def __getitem__(self, index):
         mel = self._get_mel(self.data_files[index][0])
-        text = self._get_utf8_values(self.data_files[index][1])
+        string = self.data_files[index][1]
+        text = self._get_utf8_values(string)
         
-        return torch.LongTensor(text), torch.FloatTensor(mel)
+        return torch.LongTensor(text), torch.FloatTensor(mel), string
         
     def __len__(self):
         return len(self.data_files)
@@ -144,11 +145,14 @@ class TextMelCollate():
 
         text_padded = torch.LongTensor(len(batch), max_input_len)
         text_padded.zero_()
+        strings = []
         for i in range(len(ids_sorted_decreasing)):
             text = batch[ids_sorted_decreasing[i]][0]
             text_padded[i, :text.size(0)] = text
+            strings.append(batch[ids_sorted_decreasing[i]][2])
         outputs['text'] = text_padded
         outputs['text_lengths'] = input_lengths
+        outputs['strings'] = strings
             
         # include mel padded and gate padded
         num_mels = batch[0][1].size(0)    
