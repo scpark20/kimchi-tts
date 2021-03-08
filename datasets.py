@@ -54,23 +54,39 @@ def logmelfilterbank(audio,
 class LJDataset(torch.utils.data.Dataset):
     def __init__(self, hp):
         self.hp = hp
-        self.data_files = self._get_data_files(hp.root_dir)
+        self.data_files = self._get_data_files(hp.dataset, hp.data_dir, hp.data_file)
         self.mel_matrix = librosa.filters.mel(sr=22050, n_fft=1024, n_mels=80)
         
-    def _get_data_files(self, LJSpeech_dir):
-        metadata = LJSpeech_dir + 'metadata.csv'
+    def _get_data_files(self, dataset, root_dir, file):
+        if dataset == 'lj':
+            metadata = root_dir + 'metadata.csv'
 
-        data_files = []
-        with open(metadata, 'r') as f:
-            l = f.readline().strip()
-            while l:
-                l = l.split('|')
-                wav_file = LJSpeech_dir + 'wavs/' + l[0] + '.wav'
-                text = l[2]
-                data_files.append((wav_file, text))
+            data_files = []
+            with open(metadata, 'r') as f:
                 l = f.readline().strip()
+                while l:
+                    l = l.split('|')
+                    wav_file = root_dir + 'wavs/' + l[0] + '.wav'
+                    text = l[2]
+                    data_files.append((wav_file, text))
+                    l = f.readline().strip()
 
-        return data_files    
+            return data_files    
+        
+        elif dataset == 'kss':
+            metadata = root_dir + file
+
+            data_files = []
+            with open(metadata, 'r') as f:
+                l = f.readline().strip()
+                while l:
+                    l = l.split('|')
+                    wav_file = root_dir + l[0]
+                    text = l[2]
+                    data_files.append((wav_file, text))
+                    l = f.readline().strip()
+
+            return data_files
     
     def _get_mel(self, data_file):
         wav, _ = librosa.core.load(data_file, sr=22050)
