@@ -222,6 +222,16 @@ class ConvBlock(nn.Module):
                                       nn.GELU(),
                                       Conv1d(hidden_channels, out_channels)
                                      )
+            
+        if type == 9:
+            self.conv = nn.Sequential(Conv1d(in_channels, hidden_channels, kernel_size=3, padding=1),
+                                      nn.BatchNorm1d(hidden_channels),
+                                      nn.GELU(),
+                                      Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
+                                      nn.BatchNorm1d(hidden_channels),
+                                      nn.GELU(),
+                                      Conv1d(hidden_channels, out_channels, kernel_size=3, padding=1)
+                                     )
         
     def forward(self, x):
         x = self.conv(x)
