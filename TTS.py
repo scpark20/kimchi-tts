@@ -500,6 +500,7 @@ class TTSModel(nn.Module):
         for i, length in enumerate(lengths):
             end_length = torch.log(torch.clamp((length - mean[i, length-2]) / self.hp.mean_coeff, min=1e-8))
             params[i, length-1, 0] = end_length
+            params[i, length-1, 1] = np.log(1e-8)
             
         return params
     
@@ -522,8 +523,11 @@ class TTSModel(nn.Module):
         x = batch['mels']
         # (b, l)
         cond = batch['text']
-        # (b, l, t)
-        stt_alignments = self._normalize(stt_outputs['alignments'].detach())
+        
+        stt_params = stt_outputs['alignment_params'].detach()
+        stt_params = self._adjust_mean(stt_params, batch['text_lengths'])
+        stt_alignments = self._get_attention_matrix(stt_params, torch.max(batch['mel_lengths']).item())
+        stt_alignments = self._normalize(stt_alignments)
         
         # Pad
         pad_length = ((x.size(2)-1)//self.length_unit+1) * self.length_unit-x.size(2)
@@ -548,8 +552,7 @@ class TTSModel(nn.Module):
         
         # Get Prediction and KL-div.
         y, kl_divs = self.mel_decoder(xs, conds)
-        stt_params = stt_outputs['alignment_params'].detach()
-        stt_params = self._adjust_mean(stt_params, batch['text_lengths'])
+        
         loss, recon_loss, kl_loss, param_loss = self._get_loss(x, y, kl_divs, stt_params, params, beta=beta)
         
         outputs = {'mels': x,
@@ -558,6 +561,7 @@ class TTSModel(nn.Module):
                    'recon_loss': recon_loss,
                    'kl_loss': kl_loss,
                    'param_loss': param_loss,
+                   'stt_alignments': stt_alignments,
                    'alignments': alignments}
         
         return outputs
