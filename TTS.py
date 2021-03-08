@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from torch import nn
 from torch.nn import functional as F
+import time
 
 class Conv1d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=True, 
@@ -76,15 +77,23 @@ class TTSTextEncoder(nn.Module):
         
         return params
     
-    def inference(self, x):
+    def inference(self, x, time_dict):
+        
+        t0 = time.time()
         for conv in self.convs:
             x = F.dropout(F.relu(conv(x)), 0.5, self.training)
-
+        t1 = time.time()
+        time_dict['enc_conv'] = t1 - t0
+        
         # (b, l, c)
         x = x.transpose(1, 2)
 
+        t0 = time.time()
         self.lstm.flatten_parameters()
         x, _ = self.lstm(x)
+        t1 = time.time()
+        time_dict['enc_lstm'] = t1 - t0
+        
         # (b, l, 2)
         params = self.param_linear(x)
         
@@ -143,10 +152,12 @@ class ConvBlock(nn.Module):
             self.conv = nn.Sequential(Conv1d(in_channels, hidden_channels, kernel_size=3, padding=1),
                                       nn.BatchNorm1d(hidden_channels),
                                       nn.GELU(),
-                                      Conv1d(hidden_channels, out_channels)
+                                      Conv1d(hidden_channels, out_channels, kernel_size=3, padding=1)
                                      )        
         if type == 3:
-            self.conv = Conv1d(in_channels, out_channels, kernel_size=3, padding=1)
+            self.conv = nn.Sequential(nn.BatchNorm1d(in_channels),
+                                      nn.GELU(),
+                                      Conv1d(in_channels, out_channels, kernel_size=3, padding=1))
         
         if type == 4:
             self.conv = nn.Sequential(Conv1d(in_channels, hidden_channels, weight_norm=True),
@@ -210,7 +221,7 @@ class ConvBlock(nn.Module):
                                       nn.BatchNorm1d(hidden_channels),
                                       nn.GELU(),
                                       Conv1d(hidden_channels, out_channels)
-                                     )    
+                                     )
         
     def forward(self, x):
         x = self.conv(x)
@@ -259,13 +270,21 @@ class TTSMelEncoder(nn.Module):
         return xs_list
     
 class TTSMelDecoderBlock(nn.Module):
-    def __init__(self, hp):
+    def __init__(self, hp, layer):
         super().__init__()
         
+        if hp.decoder_expand_dim:
+            dec_dim = hp.dec_dim//(2**(hp.n_layers-layer-1))
+            dec_hidden_dim = hp.dec_hidden_dim//(2**(hp.n_layers-layer-1))
+        else:
+            dec_dim = hp.dec_dim
+            dec_hidden_dim = hp.dec_hidden_dim
+        
         self.hp = hp
-        self.q = ConvBlock(hp.dec_dim + hp.enc_dim, hp.dec_hidden_dim, hp.z_dim*2, last_zero=True, type=hp.conv_type)
-        self.z_proj = Conv1d(hp.z_dim, hp.dec_dim)
-        self.out = ConvBlock(hp.dec_dim, hp.dec_hidden_dim, hp.dec_dim, type=hp.conv_type)
+        self.q = ConvBlock(dec_dim + hp.enc_dim, dec_hidden_dim, hp.z_dim*2, last_zero=True, type=hp.conv_type)
+        if hp.z_proj:
+            self.z_proj = Conv1d(hp.z_dim, dec_dim)
+        self.out = ConvBlock(dec_dim, dec_hidden_dim, dec_dim, type=hp.conv_type)
         
     def _get_kl_div(self, q_params):
         p_mean = 0
@@ -296,35 +315,53 @@ class TTSMelDecoderBlock(nn.Module):
         q_params = self.q(torch.cat([y, src], dim=1)).split(self.hp.z_dim, dim=1)
         kl_div = self._get_kl_div(q_params)
         z = self._sample_from_q(q_params)
-        z = self.z_proj(z)
+        
+        if self.hp.z_proj:
+            y = y + self.z_proj(z)
+        else:
+            y[:, :self.hp.z_dim] = y[:, :self.hp.z_dim] + z
         
         if self.hp.decoder_residual:
-            y = x + self.out(y + z)
+            y = x + self.out(y)
         else:
-            y = self.out(y + z)
+            y = self.out(y)
         
         return y, kl_div
     
-    def inference(self, x, cond, temperature):
+    def inference(self, x, cond, temperature, time_dict):
         if x is None:
             y = x = cond
         else:
             y = x + cond
 
+        t0 = time.time()
         z = self._sample_from_p(x, (x.size(0), self.hp.z_dim, x.size(2)), temperature)
-        z = self.z_proj(z)
+        t1 = time.time()
+        time_dict['random'] = time_dict['random'] + (t1 - t0)
         
-        if self.hp.decoder_residual:
-            y = x + self.out(y + z)
+        t0 = time.time()
+        
+        if self.hp.z_proj:
+            y = y + self.z_proj(z)
         else:
-            y = self.out(y + z)
+            y[:, :self.hp.z_dim] = y[:, :self.hp.z_dim] + z
+        t1 = time.time()
+        time_dict['z_proj'] = time_dict['z_proj'] + (t1 - t0)
+        
+        t0 = time.time()
+        if self.hp.decoder_residual:
+            y = x + self.out(y)
+        else:
+            y = self.out(y)
+        t1 = time.time()
+        time_dict['last_conv'] = time_dict['last_conv'] + (t1 - t0)
         
         return y
         
 class TTSMelDecoderBlocks(nn.Module):
-    def __init__(self, hp):
+    def __init__(self, hp, layer):
         super().__init__()
-        self.decoder_blocks = nn.ModuleList([TTSMelDecoderBlock(hp) for _ in range(hp.n_blocks)])
+        self.decoder_blocks = nn.ModuleList([TTSMelDecoderBlock(hp, layer) for _ in range(hp.n_blocks)])
         
     def forward(self, x, srcs, cond):
         
@@ -335,20 +372,30 @@ class TTSMelDecoderBlocks(nn.Module):
             
         return x, kl_divs
     
-    def inference(self, x, cond, temperature):
+    def inference(self, x, cond, temperature, time_dict):
         
         for decoder_block in self.decoder_blocks:
-            x = decoder_block.inference(x, cond, temperature)
+            x = decoder_block.inference(x, cond, temperature, time_dict)
             
         return x
 
 class TTSMelDecoder(nn.Module):
     def __init__(self, hp):
         super().__init__()
-        self.decoder_blocks_list = nn.ModuleList([TTSMelDecoderBlocks(hp) for _ in range(hp.n_layers)])
-        self.ups = nn.ModuleList([nn.Identity() if i == 0 else \
-                                  ConvTranspose1d(hp.dec_dim, hp.dec_dim, kernel_size=2, stride=2) for i in range(hp.n_layers)
-                                 ])
+        self.decoder_blocks_list = nn.ModuleList([TTSMelDecoderBlocks(hp, layer) for layer in range(hp.n_layers)])
+        if hp.decoder_expand_dim:
+            ups = []
+            for i in range(hp.n_layers-1):
+                up = ConvTranspose1d(hp.dec_dim//(2**(i+1)), hp.dec_dim//(2**i), kernel_size=2, stride=2)
+                ups.append(up)
+            ups.append(nn.Identity())
+            ups.reverse()
+            self.ups = nn.ModuleList(ups)
+        else:
+            self.ups = nn.ModuleList([nn.Identity() if i == 0 else \
+                                      ConvTranspose1d(hp.dec_dim, hp.dec_dim, kernel_size=2, stride=2) for i in range(hp.n_layers)
+                                     ])
+            
         self.out = Conv1d(hp.dec_dim, hp.n_mels, kernel_size=3, padding=1)
         
     def forward(self, srcs, conds):
@@ -364,12 +411,15 @@ class TTSMelDecoder(nn.Module):
         
         return x, kl_divs
         
-    def inference(self, conds, temperature):
+    def inference(self, conds, temperature, time_dict):
         x = None
         for decoder_blocks, up, cond in zip(self.decoder_blocks_list, self.ups, conds):
+            t0 = time.time()
             if x is not None:
                 x = up(x)
-            x = decoder_blocks.inference(x, cond, temperature)
+            t1 = time.time()
+            time_dict['up'] = time_dict['up'] + (t1 - t0)
+            x = decoder_blocks.inference(x, cond, temperature, time_dict)
         x = self.out(x)
         
         return x
@@ -377,8 +427,11 @@ class TTSMelDecoder(nn.Module):
 class Pooling(nn.Module):
     def __init__(self, hp):
         super().__init__()
-        
-        self.poolings = nn.ModuleList([Conv1d(hp.dec_dim, hp.dec_dim, kernel_size=2, stride=2) for _ in range(hp.n_layers-1)])
+        if hp.decoder_expand_dim:
+            self.poolings = nn.ModuleList([Conv1d(hp.dec_dim//(2**i), hp.dec_dim//(2**(i+1)), kernel_size=2, stride=2) \
+                                           for i in range(hp.n_layers-1)])
+        else:
+            self.poolings = nn.ModuleList([Conv1d(hp.dec_dim, hp.dec_dim, kernel_size=2, stride=2) for _ in range(hp.n_layers-1)])
     
     def forward(self, x):
         xs = [x]
@@ -502,24 +555,48 @@ class TTSModel(nn.Module):
     def inference(self, cond, mel_length=None, alignments=None, temperature=1.0):
         # cond : (b, l)
         
+        time_dict = {'alignment': 0.0,
+                     'random': 0.0,
+                     'last_conv': 0.0, 
+                     'z_proj': 0.0,
+                     'cond': 0.0,
+                     'up': 0.0,
+                     'encode': 0.0,
+                     'pad': 0.0,
+                     'enc_conv': 0.0,
+                     'enc_lstm': 0.0,
+                    }
+        
+        t0 = time.time()
         # (b, c, l)
         cond = self.embedding(cond).transpose(1, 2)
         # (b, l, 2)
-        params = self.text_encoder.inference(cond)
+        params = self.text_encoder.inference(cond, time_dict)
+        t1 = time.time()
+        time_dict['encode'] = t1 - t0
         
+        t0 = time.time()
         if alignments is None:
             alignments = self._get_attention_matrix(params, mel_length)
         alignments = self._normalize(alignments)
+        t1 = time.time()
+        time_dict['alignment'] = t1 - t0
         
+        t0 = time.time()
         # Pad
         pad_length = ((alignments.size(2)-1)//self.length_unit+1) * self.length_unit-alignments.size(2)
         alignments = F.pad(alignments, (0, pad_length))
+        t1 = time.time()
+        time_dict['pad'] = t1 - t0
         
+        t0 = time.time()
         # (b, c, t)
         cond = torch.bmm(cond, alignments)
         # [(b, c, t)...]
         conds = self.pooling(cond)
+        t1 = time.time()
+        time_dict['cond'] = t1 - t0
         
-        y = self.mel_decoder.inference(conds, temperature)
+        y = self.mel_decoder.inference(conds, temperature, time_dict)
         
-        return y
+        return y, time_dict

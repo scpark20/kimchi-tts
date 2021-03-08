@@ -44,10 +44,9 @@ def create_hparams():
                     text_encoder_n_convs = 3,
                     text_encoder_dim = 128,
                     text_encoder_kernel_size = 5,
-                    embedding_dim = 128,
                     
                     # TTSMelEncoder&Decoder params
-                    n_layers = 5,
+                    n_layers = 3,
                     n_blocks = 3,
                     enc_dim = 128,
                     enc_hidden_dim = 128,
@@ -57,8 +56,7 @@ def create_hparams():
                     conv_type = 0,
                     encoder_residual = True,
                     decoder_residual = True,
-                    decoder_expand_dim = False,
-                    z_proj = True
+                    decoder_expand_dim = True
                    )
 
     return stt_hparams, tts_hparams

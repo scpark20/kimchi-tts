@@ -58,7 +58,7 @@ def create_hparams():
                     encoder_residual = True,
                     decoder_residual = True,
                     decoder_expand_dim = False,
-                    z_proj = True
+                    z_proj = False
                    )
 
     return stt_hparams, tts_hparams
