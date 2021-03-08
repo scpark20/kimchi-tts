@@ -106,8 +106,8 @@ class LJDataset(torch.utils.data.Dataset):
         ts = [0]
         for t in text_utf:
             ts.append(t)
+        ts.append(0)    
         utf8_values = np.array(ts)
-        ts.append(0)
         
         return utf8_values
         
