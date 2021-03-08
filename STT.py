@@ -207,13 +207,19 @@ class STTModel(nn.Module):
     def __init__(self, hp):
         super().__init__()
         
+        self.hp = hp
         self.embedding = nn.Embedding(hp.n_symbols, hp.embedding_dim)
         self.encoder = STTEncoder(hp)
         self.decoder = STTDecoder(hp)
 
     def forward(self, batch):
+        if self.hp.mel_norm:
+            mels = batch['mels']
+        else:
+            mels = (batch['mels'] + 5) / 5
+            
         # (b, c, t)
-        encoded_inputs = self.encoder(batch['mels'], batch['mel_lengths'])
+        encoded_inputs = self.encoder(mels, batch['mel_lengths'])
         # (b, c, l)
         embedded_outputs = self.embedding(batch['text']).transpose(1, 2)
         # logits : (b, c, l), alignments : (b, l, t), alignment_params : (b, l, c)

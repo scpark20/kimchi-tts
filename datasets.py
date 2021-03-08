@@ -52,8 +52,9 @@ def logmelfilterbank(audio,
     return np.log10(np.maximum(1e-5, mel)).T
 
 class LJDataset(torch.utils.data.Dataset):
-    def __init__(self, root_dir):
-        self.data_files = self._get_data_files(root_dir)
+    def __init__(self, hp):
+        self.hp = hp
+        self.data_files = self._get_data_files(hp.root_dir)
         self.mel_matrix = librosa.filters.mel(sr=22050, n_fft=1024, n_mels=80)
         
     def _get_data_files(self, LJSpeech_dir):
@@ -77,8 +78,10 @@ class LJDataset(torch.utils.data.Dataset):
         
         with warnings.catch_warnings():
             mel = logmelfilterbank(wav, sampling_rate=22050, fft_size=1024, hop_size=256, fmin=80, fmax=7600)
-
-        mel = (mel + 5) / 5
+    
+        if self.hp.mel_norm:
+            mel = (mel + 5) / 5
+            
         return mel
     
     def _get_utf8_values(self, text):
@@ -106,8 +109,8 @@ class TextMelCollate():
     
     """ Zero-pads model inputs and targets based on number of frames per setep
     """
-    def __init__(self):
-        pass
+    def __init__(self, hp):
+        self.hp = hp
         
     def __call__(self, batch):
         """Collate's training batch from normalized text and mel-spectrogram
@@ -136,7 +139,11 @@ class TextMelCollate():
         max_target_len = max([x[1].shape[1] for x in batch])
         #max_target_len = 1024
         mel_padded = torch.FloatTensor(len(batch), num_mels, max_target_len)
-        mel_padded.fill_(0)
+        if self.hp.mel_norm:
+            mel_padded.fill_(0)
+        else:
+            mel_padded.fill_(-5)
+            
         output_lengths = torch.LongTensor(len(batch))
         for i in range(len(ids_sorted_decreasing)):
             mel = batch[ids_sorted_decreasing[i]][1]
