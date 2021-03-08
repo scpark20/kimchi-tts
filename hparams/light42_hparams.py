@@ -6,13 +6,15 @@ def create_hparams():
                    n_mels=80, 
                    n_symbols=256,
                    mel_norm=False,
+                   dataset='lj',
+                   data_dir='/data/datasets/LJSpeech-1.1/',
+                   data_file='metadata.csv',
         
                    # Alignment params 
                    mean_coeff = 8,
                    scale_coeff = 8,
         
                    # Training Params
-                   root_dir='/data/datasets/LJSpeech-1.1/',
                    batch_size=32,
                    num_workers=1,
                    annealing_steps=50000,
