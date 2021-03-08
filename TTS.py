@@ -531,7 +531,7 @@ class TTSModel(nn.Module):
         
         # Pad
         pad_length = ((x.size(2)-1)//self.length_unit+1) * self.length_unit-x.size(2)
-        x = F.pad(x, (0, pad_length))
+        x = F.pad(x, (0, pad_length), value=0 if self.hp.mel_norm else -5)
         stt_alignments = F.pad(stt_alignments, (0, pad_length))
         
         # Get Condition
