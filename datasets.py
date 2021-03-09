@@ -90,7 +90,7 @@ class LJDataset(torch.utils.data.Dataset):
     
     def _get_mel(self, data_file):
         wav, _ = librosa.core.load(data_file, sr=22050)
-        wav, _ = librosa.effects.trim(wav, top_db=40)
+        #wav, _ = librosa.effects.trim(wav, top_db=40)
         
         with warnings.catch_warnings():
             mel = logmelfilterbank(wav, sampling_rate=22050, fft_size=1024, hop_size=256, fmin=80, fmax=7600)
