@@ -31,7 +31,7 @@ class Model(nn.Module):
         grad = (end_value - start_value) / (end_index - start_index)
         y = start_value + grad * (current_index - start_index)
         
-        return y
+        return y.item()
         
     def forward(self, batch):
         stt_outputs = self.stt(batch)

@@ -8,6 +8,7 @@ from os.path import isfile, join
 import ntpath
 from torch.utils.data import DataLoader
 import warnings
+from g2p_en import G2p
 #import pytorch_lightning as pl
 
 def logmelfilterbank(audio,
@@ -56,6 +57,7 @@ class LJDataset(torch.utils.data.Dataset):
         self.hp = hp
         self.data_files = self._get_data_files(hp.dataset, hp.data_dir, hp.data_file)
         self.mel_matrix = librosa.filters.mel(sr=22050, n_fft=1024, n_mels=80)
+        self.g2p_en = G2p()
         
     def _get_data_files(self, dataset, root_dir, file):
         if dataset == 'lj':
@@ -101,6 +103,13 @@ class LJDataset(torch.utils.data.Dataset):
         return mel
     
     def _get_utf8_values(self, text):
+        if self.hp.g2p:
+            if self.hp.dataset == 'lj':
+                text_array = self.g2p_en(text)
+                text = ""
+                for t in text_array:
+                    text += t
+                
         #text = g2p(text)
         text_utf = text.encode()
         ts = [0]
