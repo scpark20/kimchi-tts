@@ -57,8 +57,13 @@ class TTSTextEncoder(nn.Module):
         
         if hp.enc_add:
             self.enc_linear = nn.Linear(hp.text_encoder_dim, hp.dec_dim)
-        
-        self.param_linear = nn.Linear(hp.text_encoder_dim, 2)
+            
+        if self.hp.attention == 'Gaussian':
+            num_params = 2 
+        elif self.hp.attention == 'Laplace':
+            num_params = 3
+            
+        self.param_linear = nn.Linear(hp.text_encoder_dim, num_params)
         self.param_linear.weight.data.zero_()
         
     def forward(self, x, input_lengths):
@@ -516,16 +521,30 @@ class TTSModel(nn.Module):
             
         return params
     
-    def _get_attention_matrix(self, params, mel_length):
-        batch, text_length, _ = params.size()
+    def _get_attention_matrix(self, hp, params, mel_length):
+        if hp.attention == 'Gaussian':
+            batch, text_length, _ = params.size()
+
+            mean = (params[:, :, 0:1].exp() * self.hp.mean_coeff).cumsum(dim=1)
+            if mel_length is None:
+                mel_length = torch.max(mean).long().item()
+            scale = params[:, :, 1:2].exp() * self.hp.scale_coeff
+            Z = torch.sqrt(2 * np.pi * scale ** 2)
+            matrix = torch.linspace(0, mel_length-1, mel_length, device=params.device).repeat(batch, text_length, 1)
+            matrix = 1 / Z * torch.exp(-0.5 * (matrix - mean) ** 2 / (scale ** 2))
         
-        mean = (params[:, :, 0:1].exp() * self.hp.mean_coeff).cumsum(dim=1)
-        if mel_length is None:
-            mel_length = torch.max(mean).long().item()
-        scale = params[:, :, 1:2].exp() * self.hp.scale_coeff
-        Z = torch.sqrt(2 * np.pi * scale ** 2)
-        matrix = torch.linspace(0, mel_length-1, mel_length, device=params.device).repeat(batch, text_length, 1)
-        matrix = 1 / Z * torch.exp(-0.5 * (matrix - mean) ** 2 / (scale ** 2))
+        elif hp.attention == 'Laplace':
+            batch, text_length, _ = params.size()
+    
+            mean = (params[:, :, 0:1].exp() * self.hp.mean_coeff).cumsum(dim=1)
+            scale = params[:, :, 1:2].exp() * self.hp.scale_coeff # 0.2
+            asym = params[:, :, 2:3].exp()
+            Z = scale / (asym + 1 / asym)
+            matrix = torch.linspace(0, mel_length-1, mel_length, device=params.device).repeat(batch, text_length, 1)
+            p = matrix - mean
+            p_pos = -scale * asym * p
+            p_neg = scale / asym * p
+            matrix = Z * torch.exp(p_pos * (p>=0) + p_neg * (p<0))
         
         return matrix
             
@@ -538,7 +557,7 @@ class TTSModel(nn.Module):
         
         stt_params = stt_outputs['alignment_params'].detach()
         stt_params = self._adjust_mean(stt_params, batch['text_lengths'])
-        stt_alignments = self._get_attention_matrix(stt_params, torch.max(batch['mel_lengths']).item())
+        stt_alignments = self._get_attention_matrix(self.hp, stt_params, torch.max(batch['mel_lengths']).item())
         stt_alignments = self._normalize(stt_alignments)
         
         # Pad
@@ -556,7 +575,7 @@ class TTSModel(nn.Module):
         else:
             params = self.text_encoder(cond, batch['text_lengths'])
         # (b, c, t)
-        alignments = self._normalize(self._get_attention_matrix(params, x.size(2)))
+        alignments = self._normalize(self._get_attention_matrix(self.hp, params, x.size(2)))
         # (b, c, t)
         cond = torch.bmm(cond, stt_alignments)
         
@@ -611,7 +630,7 @@ class TTSModel(nn.Module):
         
         t0 = time.time()
         if alignments is None:
-            alignments = self._get_attention_matrix(params, mel_length)
+            alignments = self._get_attention_matrix(self.hp, params, mel_length)
         alignments = self._normalize(alignments)
         t1 = time.time()
         time_dict['alignment'] = t1 - t0

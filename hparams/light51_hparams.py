@@ -6,14 +6,18 @@ def create_hparams():
                    n_mels=80, 
                    n_symbols=256,
                    mel_norm=True,
-                   dataset='kss',
-                   data_dir='/data/datasets/kss_22050/',
-                   data_file='transcript.v.1.3.txt',
+#                    dataset='kss',
+#                    data_dir='/data/datasets/kss_22050/',
+#                    data_file='transcript.v.1.3.txt',
+        
+                   dataset='lj',
+                   data_dir='/data/datasets/LJSpeech-1.1/',
+                   data_file='metadata.csv',
         
                    # Alignment params 
                    mean_coeff = 8,
-                   scale_coeff = 8,
-                   attention = 'Gaussian',
+                   scale_coeff = 0.2,
+                   attention = 'Laplace',
         
                    # Training Params
                    batch_size=32,
@@ -27,15 +31,15 @@ def create_hparams():
                    common_hparams,
                        
                    # STT Encoder params
-                   embedding_dim = 256,
+                   embedding_dim = 128,
                    encoder_n_convs = 3,
-                   encoding_dim = 256,
+                   encoding_dim = 128,
                    encoder_kernel_size = 5,
         
                    # STT Decoder params
-                   prenet_dim = 256,
-                   attention_rnn_dim = 512,
-                   decoder_rnn_dim = 512,
+                   prenet_dim = 128,
+                   attention_rnn_dim = 256,
+                   decoder_rnn_dim = 256,
                    p_attention_dropout = 0.1,
                    p_decoder_dropout = 0.1,
         
@@ -52,11 +56,11 @@ def create_hparams():
                     
                     # TTSMelEncoder&Decoder params
                     n_layers = 4,
-                    n_blocks = 4,
-                    enc_dim = 128,
-                    enc_hidden_dim = 128,
-                    dec_dim = 128,
-                    dec_hidden_dim = 128,
+                    n_blocks = 1,
+                    enc_dim = 512,
+                    enc_hidden_dim = 512,
+                    dec_dim = 512,
+                    dec_hidden_dim = 512,
                     z_dim = 16,
                     conv_type = 8,
                     encoder_residual = True,

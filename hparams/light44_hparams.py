@@ -5,7 +5,7 @@ def create_hparams():
                    # Data params
                    n_mels=80, 
                    n_symbols=256,
-                   mel_norm=False,
+                   mel_norm=True,
                    dataset='kss',
                    data_dir='/data/datasets/kss_22050/',
                    data_file='transcript.v.1.3.txt',
@@ -13,6 +13,7 @@ def create_hparams():
                    # Alignment params 
                    mean_coeff = 8,
                    scale_coeff = 8,
+                   attention = 'Gaussian',
         
                    # Training Params
                    batch_size=32,
@@ -26,15 +27,15 @@ def create_hparams():
                    common_hparams,
                        
                    # STT Encoder params
-                   embedding_dim = 128,
+                   embedding_dim = 256,
                    encoder_n_convs = 3,
-                   encoding_dim = 128,
+                   encoding_dim = 256,
                    encoder_kernel_size = 5,
         
                    # STT Decoder params
-                   prenet_dim = 128,
-                   attention_rnn_dim = 256,
-                   decoder_rnn_dim = 256,
+                   prenet_dim = 256,
+                   attention_rnn_dim = 512,
+                   decoder_rnn_dim = 512,
                    p_attention_dropout = 0.1,
                    p_decoder_dropout = 0.1,
         
@@ -61,7 +62,8 @@ def create_hparams():
                     encoder_residual = True,
                     decoder_residual = True,
                     decoder_expand_dim = False,
-                    z_proj = False
+                    z_proj = False,
+                    enc_add = True
                    )
 
     return stt_hparams, tts_hparams

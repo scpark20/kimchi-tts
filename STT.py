@@ -72,6 +72,67 @@ class GaussianAttention(nn.Module):
         context = context.squeeze(1)
         
         return context, weight, params
+    
+class LaplaceAttention(nn.Module):
+    def __init__(self, hp):
+        super().__init__()
+        
+        self.hp = hp
+        self.param_linear = nn.Linear(hp.attention_rnn_dim, 3)
+        self.param_linear.weight.data.zero_()
+        
+    def init_mean(self, tensor, batch_size):
+        self.mean = tensor.data.new(batch_size, 1).zero_()
+        
+    def _linspace(self, tensor, batch, length):
+        # (l)
+        lin = torch.linspace(start=0, end=length-1, steps=length, device=tensor.device)
+        # (b, l)
+        lin = lin.unsqueeze(0).repeat(batch, 1)
+        
+        return lin
+    
+    def _get_weight(self, params, length):
+        
+        # Mean
+        mean_delta = torch.exp(params[:, 0:1]) * self.hp.mean_coeff
+        self.mean = self.mean + mean_delta
+        
+        # Scale
+        scale = torch.exp(params[:, 1:2]) * self.hp.scale_coeff
+        
+        # Asymmetry
+        asym = torch.exp(params[:, 2:3])
+        
+        # Z
+        Z = scale / (asym + 1 / asym)
+        
+        # (b, l)
+        lin = self._linspace(params, batch=params.size(0), length=length)
+        p = lin - self.mean
+        p_pos = -scale * asym * p
+        p_neg = scale / asym * p
+        
+        weight = Z * torch.exp(p_pos * (p>=0) + p_neg * (p<0))
+        
+        return weight
+        
+    def forward(self, attention_hidden, memory, mask):
+        
+        # (b, 2)
+        params = self.param_linear(attention_hidden)
+        # (b, l)
+        weight = self._get_weight(params, memory.size(1))
+        if mask is not None:
+            weight.data.masked_fill_(mask, 0)
+        
+        # (b, 1, c)
+        context = torch.bmm(weight.unsqueeze(1), memory)
+        # (b, c)
+        context = context.squeeze(1)
+        
+        return context, weight, params
+
         
 class STTEncoder(nn.Module):
     def __init__(self, hp):
@@ -118,7 +179,11 @@ class STTDecoder(nn.Module):
         self.hp = hp
         self.prenet = STTPrenet(hp)
         self.attention_rnn = nn.LSTMCell(hp.prenet_dim + hp.encoding_dim, hp.attention_rnn_dim)
-        self.gaussian_attention = GaussianAttention(hp)
+        if hp.attention == 'Gaussian':
+            self.attention = GaussianAttention(hp)
+        elif hp.attention == 'Laplace':
+            self.attention = LaplaceAttention(hp)
+            
         self.decoder_rnn = nn.LSTMCell(hp.attention_rnn_dim + hp.encoding_dim, hp.decoder_rnn_dim)
         self.output_linear = nn.Linear(hp.decoder_rnn_dim + hp.encoding_dim, hp.n_symbols)
         
@@ -159,7 +224,7 @@ class STTDecoder(nn.Module):
         self.attention_hidden = F.dropout(self.attention_hidden, self.hp.p_attention_dropout, self.training)
         
         # Attention
-        self.attention_context, weight, params = self.gaussian_attention(self.attention_hidden, self.memory, self.mask)
+        self.attention_context, weight, params = self.attention(self.attention_hidden, self.memory, self.mask)
         
         # Decoder
         decoder_input = torch.cat([self.attention_hidden, self.attention_context], dim=1)
@@ -187,7 +252,7 @@ class STTDecoder(nn.Module):
         decoder_inputs = self.prenet(decoder_inputs)
         
         self._init_decoder_states(memory, mask=~self._get_mask_from_lengths(memory_lengths))
-        self.gaussian_attention.init_mean(memory, memory.size(0))
+        self.attention.init_mean(memory, memory.size(0))
         
         logits, alignments, params = [], [], []
         while len(logits) < decoder_inputs.size(0) - 1:
@@ -227,6 +292,7 @@ class STTModel(nn.Module):
         loss = nn.CrossEntropyLoss()(logits.transpose(1, 2), batch['text'])
         
         outputs = {'loss': loss,
+                   'mels': mels,
                    'alignments': alignments,
                    'alignment_params': alignment_params
                   }
