@@ -53,8 +53,9 @@ def logmelfilterbank(audio,
     return np.log10(np.maximum(1e-5, mel)).T
 
 class LJDataset(torch.utils.data.Dataset):
-    def __init__(self, hp):
+    def __init__(self, hp, split='train'):
         self.hp = hp
+        self.split = split
         self.data_files = self._get_data_files(hp.dataset, hp.data_dir, hp.data_file)
         self.mel_matrix = librosa.filters.mel(sr=22050, n_fft=1024, n_mels=80)
         self.g2p_en = G2p()
@@ -68,12 +69,33 @@ class LJDataset(torch.utils.data.Dataset):
                 l = f.readline().strip()
                 while l:
                     l = l.split('|')
+                    if self.split == 'test':
+                        if 'LJ003' in l[0]:
+                            pass
+                        else:
+                            l = f.readline().strip()
+                            continue
+                            
+                    elif self.split == 'valid':
+                        if 'LJ001' in l[0] or 'LJ002' in l[0]:
+                            pass
+                        else:
+                            l = f.readline().strip()
+                            continue
+                    
+                    else: # train
+                        if 'LJ001' in l[0] or 'LJ002' in l[0] or 'LJ003' in l[0]:
+                            l = f.readline().strip()
+                            continue
+                        else:
+                            pass
+                    
                     wav_file = root_dir + 'wavs/' + l[0] + '.wav'
                     text = l[2]
                     data_files.append((wav_file, text))
                     l = f.readline().strip()
 
-            return data_files    
+            return data_files  
         
         elif dataset == 'kss':
             metadata = root_dir + file
