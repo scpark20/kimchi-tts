@@ -9,6 +9,7 @@ def create_hparams():
                    dataset='kss',
                    data_dir='/data/datasets/kss_22050/',
                    data_file='transcript.v.1.3.txt',
+                   g2p=False,
         
                    # Alignment params 
                    mean_coeff = 8,
