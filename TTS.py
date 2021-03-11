@@ -653,5 +653,6 @@ class TTSModel(nn.Module):
         time_dict['cond'] = t1 - t0
         
         y = self.mel_decoder.inference(conds, temperature, time_dict)
+        y = y[:, :, :-pad_length]
         
         return y, time_dict

@@ -53,11 +53,11 @@ def create_hparams():
                     
                     # TTSMelEncoder&Decoder params
                     n_layers = 5,
-                    n_blocks = 1,
-                    enc_dim = 512,
-                    enc_hidden_dim = 512,
-                    dec_dim = 512,
-                    dec_hidden_dim = 512,
+                    n_blocks = 4,
+                    enc_dim = 128,
+                    enc_hidden_dim = 128,
+                    dec_dim = 128,
+                    dec_hidden_dim = 128,
                     z_dim = 16,
                     conv_type = 8,
                     encoder_residual = True,
