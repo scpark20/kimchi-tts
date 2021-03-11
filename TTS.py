@@ -329,7 +329,9 @@ class TTSMelDecoderBlock(nn.Module):
         return sample
     
     def _sample_from_p(self, tensor, shape, temperature=1.0):
-        sample = tensor.new(*shape).normal_() * temperature
+        sample = tensor.new(*shape).normal_()
+        sample = torch.clamp(sample, min=-3, max=3)
+        sample = sample * temperature
         
         return sample
     
