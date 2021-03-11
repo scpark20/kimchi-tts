@@ -328,9 +328,9 @@ class TTSMelDecoderBlock(nn.Module):
         
         return sample
     
-    def _sample_from_p(self, tensor, shape, temperature=1.0):
+    def _sample_from_p(self, tensor, shape, temperature=1.0, clip=3):
         sample = tensor.new(*shape).normal_()
-        sample = torch.clamp(sample, min=-3, max=3)
+        sample = torch.clamp(sample, min=-clip, max=clip)
         sample = sample * temperature
         
         return sample
@@ -357,14 +357,14 @@ class TTSMelDecoderBlock(nn.Module):
         
         return y, kl_div
     
-    def inference(self, x, cond, temperature, time_dict):
+    def inference(self, x, cond, temperature, clip, time_dict):
         if x is None:
             y = x = cond
         else:
             y = x + cond
 
         t0 = time.time()
-        z = self._sample_from_p(x, (x.size(0), self.hp.z_dim, x.size(2)), temperature)
+        z = self._sample_from_p(x, (x.size(0), self.hp.z_dim, x.size(2)), temperature, clip)
         t1 = time.time()
         time_dict['random'] = time_dict['random'] + (t1 - t0)
         
@@ -401,10 +401,10 @@ class TTSMelDecoderBlocks(nn.Module):
             
         return x, kl_divs
     
-    def inference(self, x, cond, temperature, time_dict):
+    def inference(self, x, cond, temperature, clip, time_dict):
         
         for decoder_block in self.decoder_blocks:
-            x = decoder_block.inference(x, cond, temperature, time_dict)
+            x = decoder_block.inference(x, cond, temperature, clip, time_dict)
             
         return x
 
@@ -440,7 +440,7 @@ class TTSMelDecoder(nn.Module):
         
         return x, kl_divs
         
-    def inference(self, conds, temperature, time_dict):
+    def inference(self, conds, temperature, clip, time_dict):
         x = None
         for decoder_blocks, up, cond in zip(self.decoder_blocks_list, self.ups, conds):
             t0 = time.time()
@@ -448,7 +448,7 @@ class TTSMelDecoder(nn.Module):
                 x = up(x)
             t1 = time.time()
             time_dict['up'] = time_dict['up'] + (t1 - t0)
-            x = decoder_blocks.inference(x, cond, temperature, time_dict)
+            x = decoder_blocks.inference(x, cond, temperature, clip, time_dict)
         x = self.out(x)
         
         return x
@@ -603,7 +603,7 @@ class TTSModel(nn.Module):
         
         return outputs
         
-    def inference(self, cond, mel_length=None, alignments=None, temperature=1.0):
+    def inference(self, cond, mel_length=None, alignments=None, temperature=1.0, clip=3):
         # cond : (b, l)
         
         time_dict = {'alignment': 0.0,
@@ -652,7 +652,7 @@ class TTSModel(nn.Module):
         t1 = time.time()
         time_dict['cond'] = t1 - t0
         
-        y = self.mel_decoder.inference(conds, temperature, time_dict)
+        y = self.mel_decoder.inference(conds, temperature, clip, time_dict)
         y = y[:, :, :-pad_length]
         
         return y, time_dict
