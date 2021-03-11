@@ -539,6 +539,8 @@ class TTSModel(nn.Module):
             batch, text_length, _ = params.size()
     
             mean = (params[:, :, 0:1].exp() * self.hp.mean_coeff).cumsum(dim=1)
+            if mel_length is None:
+                mel_length = torch.max(mean).long().item()
             scale = params[:, :, 1:2].exp() * self.hp.scale_coeff # 0.2
             asym = params[:, :, 2:3].exp()
             Z = scale / (asym + 1 / asym)
