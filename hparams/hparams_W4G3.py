@@ -13,8 +13,8 @@ def create_hparams():
         
                    # Alignment params 
                    mean_coeff = 8,
-                   scale_coeff = 0.2,
-                   attention = 'Laplace',
+                   scale_coeff = 8,
+                   attention = 'Gaussian',
         
                    # Training Params
                    batch_size=32,
@@ -53,11 +53,11 @@ def create_hparams():
                     
                     # TTSMelEncoder&Decoder params
                     n_layers = 4,
-                    n_blocks = 1,
-                    enc_dim = 512,
-                    enc_hidden_dim = 512,
-                    dec_dim = 512,
-                    dec_hidden_dim = 512,
+                    n_blocks = 3,
+                    enc_dim = 128,
+                    enc_hidden_dim = 128,
+                    dec_dim = 128,
+                    dec_hidden_dim = 128,
                     z_dim = 16,
                     conv_type = 8,
                     encoder_residual = True,
