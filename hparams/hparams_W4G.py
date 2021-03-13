@@ -7,7 +7,7 @@ def create_hparams():
                    n_symbols=256,
                    mel_norm=False,
                    dataset='lj',
-                   data_dir='/home/scpark/hard/datasets/LJSpeech-1.1/',
+                   data_dir='/data/datasets/LJSpeech-1.1/',
                    data_file='metadata.csv',
                    g2p=True,
         
@@ -21,7 +21,11 @@ def create_hparams():
                    num_workers=1,
                    annealing_steps=50000,
                    lr=1e-4,
-                   weight_decay=1e-6
+                   weight_decay=1e-6,
+        
+                   # Inference Params
+                   truncated_min = -2,
+                   truncated_max = 3, 
                    )
 
     stt_hparams = EasyDict(

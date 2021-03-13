@@ -112,12 +112,14 @@ class LJDataset(torch.utils.data.Dataset):
                             l = f.readline().strip()
                             continue
                     
-                    else: # train
+                    elif self.split == 'train':
                         if 'LJ001' in l[0] or 'LJ002' in l[0] or 'LJ003' in l[0]:
                             l = f.readline().strip()
                             continue
                         else:
                             pass
+                    else:
+                        pass
                     
                     wav_file = root_dir + 'wavs/' + l[0] + '.wav'
                     text = l[2]
