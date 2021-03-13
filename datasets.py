@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import os
 from os import listdir
-from os.path import isfile, join
+from os.path import isfile, join, isdir
 import ntpath
 from torch.utils.data import DataLoader
 import warnings
@@ -51,6 +51,35 @@ def logmelfilterbank(audio,
     mel_basis = librosa.filters.mel(sampling_rate, fft_size, num_mels, fmin, fmax)
     mel = np.dot(spc, mel_basis.T)
     return np.log10(np.maximum(1e-5, mel)).T
+
+class LibriDataset(torch.utils.data.Dataset):
+    def __init__(self, hp, split='train'):
+        self.hp = hp
+        self.split = split
+        self.data_files = self._get_data_files(hp.dataset, hp.data_dir, hp.data_file)
+        self.mel_matrix = librosa.filters.mel(sr=22050, n_fft=1024, n_mels=80)
+        self.g2p_en = G2p()
+        
+    def _get_data_files(self, root_dir):
+        dirs = ['103', '150', '200', '250']
+        dirs = [join(root, f) for f in dirs if isdir(join(root, f))]
+
+        sub_dirs = []
+        for dir in dirs:
+            sub_dirs += [join(dir, f) for f in listdir(dir) if isdir(join(dir, f))]
+
+        files = []
+        for dir in sub_dirs:
+            files += [join(dir, f) for f in listdir(dir) if isfile(join(dir, f)) and '.normalized.txt' in f]
+           
+        data_files = []
+        for file in files:
+            with open(file, 'r') as f:
+                l = f.readline()
+            data_files.append(())
+
+        
+    
 
 class LJDataset(torch.utils.data.Dataset):
     def __init__(self, hp, split='train'):
