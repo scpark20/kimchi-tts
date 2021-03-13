@@ -297,7 +297,7 @@ class TTSMelEncoder(nn.Module):
         return xs_list
     
 class TTSMelDecoderBlock(nn.Module):
-    def __init__(self, hp, layer):
+    def __init__(self, hp, layer, mode):
         super().__init__()
         
         if hp.decoder_expand_dim:
@@ -308,7 +308,8 @@ class TTSMelDecoderBlock(nn.Module):
             dec_hidden_dim = hp.dec_hidden_dim
         
         self.hp = hp
-        self.q = ConvBlock(dec_dim + hp.enc_dim, dec_hidden_dim, hp.z_dim*2, last_zero=True, type=hp.conv_type)
+        if mode == 'train':
+            self.q = ConvBlock(dec_dim + hp.enc_dim, dec_hidden_dim, hp.z_dim*2, last_zero=True, type=hp.conv_type)
         if hp.z_proj:
             self.z_proj = Conv1d(hp.z_dim, dec_dim)
         self.out = ConvBlock(dec_dim, dec_hidden_dim, dec_dim, type=hp.conv_type)
@@ -388,9 +389,9 @@ class TTSMelDecoderBlock(nn.Module):
         return y
         
 class TTSMelDecoderBlocks(nn.Module):
-    def __init__(self, hp, layer):
+    def __init__(self, hp, layer, mode):
         super().__init__()
-        self.decoder_blocks = nn.ModuleList([TTSMelDecoderBlock(hp, layer) for _ in range(hp.n_blocks)])
+        self.decoder_blocks = nn.ModuleList([TTSMelDecoderBlock(hp, layer, mode) for _ in range(hp.n_blocks)])
         
     def forward(self, x, srcs, cond):
         
@@ -409,9 +410,9 @@ class TTSMelDecoderBlocks(nn.Module):
         return x
 
 class TTSMelDecoder(nn.Module):
-    def __init__(self, hp):
+    def __init__(self, hp, mode):
         super().__init__()
-        self.decoder_blocks_list = nn.ModuleList([TTSMelDecoderBlocks(hp, layer) for layer in range(hp.n_layers)])
+        self.decoder_blocks_list = nn.ModuleList([TTSMelDecoderBlocks(hp, layer, mode) for layer in range(hp.n_layers)])
         if hp.decoder_expand_dim:
             ups = []
             for i in range(hp.n_layers-1):
@@ -472,7 +473,7 @@ class Pooling(nn.Module):
         return xs
         
 class TTSModel(nn.Module):
-    def __init__(self, hp):
+    def __init__(self, hp, mode='train'):
         super().__init__()
         
         self.hp = hp
@@ -481,8 +482,9 @@ class TTSModel(nn.Module):
         self.embedding = nn.Embedding(hp.n_symbols, hp.dec_dim)
         self.text_encoder = TTSTextEncoder(hp)
         self.pooling = Pooling(hp)
-        self.mel_encoder = TTSMelEncoder(hp)
-        self.mel_decoder = TTSMelDecoder(hp)
+        if mode == 'train':
+            self.mel_encoder = TTSMelEncoder(hp)
+        self.mel_decoder = TTSMelDecoder(hp, mode)
         
     def _get_loss(self, src, pred, kl_divs, stt_params, tts_params, beta):
         # Reconstruction Loss

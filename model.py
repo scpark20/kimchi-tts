@@ -10,14 +10,15 @@ from TTS import TTSModel
 Pytorch Model
 '''
 class Model(nn.Module):
-    def __init__(self, stt_hparams, tts_hparams):
+    def __init__(self, stt_hparams, tts_hparams, mode='train'):
         super().__init__()
         self.hp = tts_hparams
         
-        self.stt = STTModel(stt_hparams)
-        self.tts = TTSModel(tts_hparams)
-        
-        self.global_step = nn.Parameter(torch.zeros(1).long(), requires_grad=False)
+        if mode == 'train':
+            self.stt = STTModel(stt_hparams)
+            self.global_step = nn.Parameter(torch.zeros(1).long(), requires_grad=False)
+            
+        self.tts = TTSModel(tts_hparams, mode=mode)
         
     def increase_step(self):
         self.global_step[0] = self.global_step + 1

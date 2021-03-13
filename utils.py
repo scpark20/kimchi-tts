@@ -57,7 +57,8 @@ class Logger:
             checkpoint = torch.load(path, map_location=torch.device('cpu'))    
             try:
                 model.load_state_dict(checkpoint['model_state_dict'], strict=False)
-                optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+                if optimizer is not None:
+                    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             except:
                 model.load_state_dict(checkpoint['model_state_dict'], strict=False)
                 
