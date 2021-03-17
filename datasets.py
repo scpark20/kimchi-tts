@@ -99,14 +99,14 @@ class LJDataset(torch.utils.data.Dataset):
                 while l:
                     l = l.split('|')
                     if self.split == 'test':
-                        if 'LJ003' in l[0]:
+                        if 'LJ001' in l[0] or 'LJ002' in l[0]:
                             pass
                         else:
                             l = f.readline().strip()
                             continue
                             
                     elif self.split == 'valid':
-                        if 'LJ001' in l[0] or 'LJ002' in l[0]:
+                        if 'LJ003' in l[0]:
                             pass
                         else:
                             l = f.readline().strip()
