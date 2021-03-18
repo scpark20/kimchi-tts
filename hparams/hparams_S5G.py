@@ -7,7 +7,7 @@ def create_hparams():
                    n_symbols=256,
                    mel_norm=False,
                    dataset='lj',
-                   data_dir='/data/datasets/LJSpeech-1.1/',
+                   data_dir='/home/scpark/hard/datasets/LJSpeech-1.1/',
                    data_file='metadata.csv',
                    g2p=True,
         
