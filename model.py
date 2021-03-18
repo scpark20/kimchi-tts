@@ -42,8 +42,8 @@ class Model(nn.Module):
         
         return stt_outputs, tts_outputs
         
-    def inference(self, cond, alignments=None, mel_length=None, temperature=1.0, clip=3):
-        y = self.tts.inference(cond, alignments, mel_length, temperature, clip)
+    def inference(self, cond, alignments=None, mel_length=None, temperature=1.0, speed=1.0):
+        y = self.tts.inference(cond, alignments, mel_length, temperature, speed)
         
         return y
 

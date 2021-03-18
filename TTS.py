@@ -528,14 +528,14 @@ class TTSModel(nn.Module):
             
         return params
     
-    def _get_attention_matrix(self, hp, params, mel_length):
+    def _get_attention_matrix(self, hp, params, mel_length, speed=1.0):
         if hp.attention == 'Gaussian':
             batch, text_length, _ = params.size()
 
-            mean = (params[:, :, 0:1].exp() * self.hp.mean_coeff).cumsum(dim=1)
+            mean = (params[:, :, 0:1].exp() * self.hp.mean_coeff * speed).cumsum(dim=1)
             if mel_length is None:
                 mel_length = torch.max(mean).long().item()
-            scale = params[:, :, 1:2].exp() * self.hp.scale_coeff
+            scale = params[:, :, 1:2].exp() * self.hp.scale_coeff / speed
             Z = torch.sqrt(2 * np.pi * scale ** 2)
             matrix = torch.linspace(0, mel_length-1, mel_length, device=params.device).repeat(batch, text_length, 1)
             matrix = 1 / Z * torch.exp(-0.5 * (matrix - mean) ** 2 / (scale ** 2))
@@ -543,10 +543,10 @@ class TTSModel(nn.Module):
         elif hp.attention == 'Laplace':
             batch, text_length, _ = params.size()
     
-            mean = (params[:, :, 0:1].exp() * self.hp.mean_coeff).cumsum(dim=1)
+            mean = (params[:, :, 0:1].exp() * self.hp.mean_coeff * speed).cumsum(dim=1)
             if mel_length is None:
                 mel_length = torch.max(mean).long().item()
-            scale = params[:, :, 1:2].exp() * self.hp.scale_coeff # 0.2
+            scale = params[:, :, 1:2].exp() * self.hp.scale_coeff / speed # 0.2
             asym = params[:, :, 2:3].exp()
             Z = scale / (asym + 1 / asym)
             matrix = torch.linspace(0, mel_length-1, mel_length, device=params.device).repeat(batch, text_length, 1)
@@ -610,7 +610,7 @@ class TTSModel(nn.Module):
         
         return outputs
         
-    def inference(self, cond, mel_length=None, alignments=None, temperature=1.0, clip=3):
+    def inference(self, cond, mel_length=None, alignments=None, temperature=1.0, speed=1.0):
         # cond : (b, l)
         
         time_dict = {'alignment': 0.0,
@@ -639,7 +639,7 @@ class TTSModel(nn.Module):
         
         t0 = time.time()
         if alignments is None:
-            alignments = self._get_attention_matrix(self.hp, params, mel_length)
+            alignments = self._get_attention_matrix(self.hp, params, mel_length, speed)
         alignments = self._normalize(alignments)
         t1 = time.time()
         time_dict['alignment'] = t1 - t0
