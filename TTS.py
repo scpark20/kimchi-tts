@@ -311,7 +311,8 @@ class TTSMelDecoderBlock(nn.Module):
         self.hp = hp
         if mode == 'train':
             self.q = ConvBlock(dec_dim + hp.enc_dim, dec_hidden_dim, hp.z_dim*2, last_zero=True, type=hp.conv_type)
-        self.tsn = TruncatedStandardNormal(a=hp.truncated_min, b=hp.truncated_max)    
+        self.clip = hp.truncated_max
+        self.tsn = TruncatedStandardNormal(a=-self.clip, b=self.clip)
         if hp.z_proj:
             self.z_proj = Conv1d(hp.z_dim, dec_dim)
         self.out = ConvBlock(dec_dim, dec_hidden_dim, dec_dim, type=hp.conv_type)
@@ -331,11 +332,15 @@ class TTSMelDecoderBlock(nn.Module):
         
         return sample
     
-    def _sample_from_p(self, tensor, shape, temperature=1.0, clip=3):
-        #sample = tensor.new(*shape).normal_()
+    def _sample_from_p(self, tensor, shape, temperature=1.0, clip=None):
+        sample = tensor.new(*shape).normal_()
         #sample = torch.clamp(sample, min=-clip, max=clip)
-        sample = self.tsn.rsample(tensor, shape)
-        sample = sample * temperature
+        
+#         if clip is not None and clip != self.clip:
+#             self.clip = clip
+#             self.tsn = TruncatedStandardNormal(a=-self.clip, b=self.clip)
+#         sample = self.tsn.rsample(tensor, shape)
+#        sample = sample * temperature
         
         return sample
     
@@ -610,7 +615,7 @@ class TTSModel(nn.Module):
         
         return outputs
         
-    def inference(self, cond, mel_length=None, alignments=None, temperature=1.0, speed=1.0):
+    def inference(self, cond, mel_length=None, alignments=None, temperature=1.0, speed=1.0, clip=None):
         # cond : (b, l)
         
         time_dict = {'alignment': 0.0,
