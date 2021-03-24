@@ -333,14 +333,14 @@ class TTSMelDecoderBlock(nn.Module):
         return sample
     
     def _sample_from_p(self, tensor, shape, temperature=1.0, clip=None):
-        sample = tensor.new(*shape).normal_() * temperature
-        #sample = torch.clamp(sample, min=-clip, max=clip)
-        
-#         if clip is not None and clip != self.clip:
-#             self.clip = clip
-#             self.tsn = TruncatedStandardNormal(a=-self.clip, b=self.clip)
-#         sample = self.tsn.rsample(tensor, shape)
-#        sample = sample * temperature
+        if clip is None:
+            print('Normal')
+            sample = tensor.new(*shape).normal_() * temperature
+        else:
+            print('TruncatedNormal', clip)
+            tsn = TruncatedStandardNormal(a=-clip, b=clip)
+            sample = tsn.rsample(tensor, shape)
+            sample = sample * temperature
         
         return sample
     
