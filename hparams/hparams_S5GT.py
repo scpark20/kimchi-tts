@@ -4,7 +4,7 @@ def create_hparams():
     common_hparams = EasyDict(
                    # Data params
                    n_mels=80, 
-                   n_symbols=256,
+                   n_symbols=257,
                    mel_norm=False,
                    dataset='lj',
                    data_dir='LJSpeech-1.1/',
@@ -26,8 +26,8 @@ def create_hparams():
                    # Inference Params
                    truncated_min = -2,
                    truncated_max = 2, 
-        
-                   eos_token = False
+            
+                   eos_token = True
                    )
 
     stt_hparams = EasyDict(

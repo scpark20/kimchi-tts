@@ -26,6 +26,8 @@ def create_hparams():
                    # Inference Params
                    truncated_min = -2,
                    truncated_max = 2, 
+                    
+                   eos_token = False
                    )
 
     stt_hparams = EasyDict(

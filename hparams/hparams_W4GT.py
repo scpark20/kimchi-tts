@@ -4,7 +4,7 @@ def create_hparams():
     common_hparams = EasyDict(
                    # Data params
                    n_mels=80, 
-                   n_symbols=256,
+                   n_symbols=257,
                    mel_norm=False,
                    dataset='lj',
                    data_dir='LJSpeech-1.1/',
@@ -27,7 +27,7 @@ def create_hparams():
                    truncated_min = -2,
                    truncated_max = 2, 
         
-                   eos_token = False
+                   eos_token = True
                    )
 
     stt_hparams = EasyDict(
@@ -58,12 +58,12 @@ def create_hparams():
                     embedding_dim = 128,
                     
                     # TTSMelEncoder&Decoder params
-                    n_layers = 5,
-                    n_blocks = 1,
-                    enc_dim = 512,
-                    enc_hidden_dim = 512,
-                    dec_dim = 512,
-                    dec_hidden_dim = 512,
+                    n_layers = 4,
+                    n_blocks = 4,
+                    enc_dim = 128,
+                    enc_hidden_dim = 128,
+                    dec_dim = 128,
+                    dec_hidden_dim = 128,
                     z_dim = 16,
                     conv_type = 8,
                     encoder_residual = True,

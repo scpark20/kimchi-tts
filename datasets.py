@@ -168,7 +168,10 @@ class LJDataset(torch.utils.data.Dataset):
         ts = [0]
         for t in text_utf:
             ts.append(t)
-        ts.append(0)    
+        if self.hp.eos_token:
+            ts.append(256)    
+        else:
+            ts.append(0)
         utf8_values = np.array(ts)
         
         return utf8_values

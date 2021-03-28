@@ -17,7 +17,7 @@ def create_hparams():
                    attention = 'Gaussian',
         
                    # Training Params
-                   batch_size=32,
+                   batch_size=16,
                    num_workers=1,
                    annealing_steps=50000,
                    lr=1e-4,

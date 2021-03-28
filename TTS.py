@@ -334,10 +334,10 @@ class TTSMelDecoderBlock(nn.Module):
     
     def _sample_from_p(self, tensor, shape, temperature=1.0, clip=None):
         if clip is None:
-            print('Normal')
+            #print('Normal')
             sample = tensor.new(*shape).normal_() * temperature
         else:
-            print('TruncatedNormal', clip)
+            #print('TruncatedNormal', clip)
             tsn = TruncatedStandardNormal(a=-clip, b=clip)
             sample = tsn.rsample(tensor, shape)
             sample = sample * temperature
@@ -520,24 +520,35 @@ class TTSModel(nn.Module):
         
         return alignments
     
-    def _adjust_mean(self, params, lengths):
+    def _adjust_mean(self, params, text_lengths, mel_lengths):
         # params : (b, l, 2)
         # lengths : (b)
         
         mean = (params[:, :, 0].exp() * self.hp.mean_coeff).cumsum(dim=1)
         
-        for i, length in enumerate(lengths):
-            end_length = torch.log(torch.clamp((length - mean[i, length-2]) / self.hp.mean_coeff, min=1e-8))
-            params[i, length-1, 0] = end_length
-            params[i, length-1, 1] = np.log(1e-8)
-            
+        for i, (text_length, mel_length) in enumerate(zip(text_lengths, mel_lengths)):
+            e = mel_length - mean[i, text_length-2]
+            #print(i, mel_length, mean[i, text_length-2])
+            e = e / self.hp.mean_coeff
+            #print(i, e)
+            e = torch.clamp(e, min=1e-8)
+            #print(i, e)
+            end_length = torch.log(e)
+            #print(i, end_length)
+            params[i, text_length-1, 0] = end_length
+            params[i, text_length-1, 1] = np.log(1e-8)
+        
+        print(params[0, text_lengths[0]-1, 0])
         return params
     
     def _get_attention_matrix(self, hp, params, mel_length, speed=1.0):
         if hp.attention == 'Gaussian':
             batch, text_length, _ = params.size()
-
-            mean = (params[:, :, 0:1].exp() * self.hp.mean_coeff * speed).cumsum(dim=1)
+            
+            delta_mean = params[:, :, 0:1].exp() * self.hp.mean_coeff * speed
+            #print(delta_mean)
+            mean = delta_mean.cumsum(dim=1)
+            #print(mean)
             if mel_length is None:
                 mel_length = torch.max(mean).long().item()
             scale = params[:, :, 1:2].exp() * self.hp.scale_coeff / speed
@@ -570,7 +581,7 @@ class TTSModel(nn.Module):
         cond = batch['text']
         
         stt_params = stt_outputs['alignment_params'].detach()
-        stt_params = self._adjust_mean(stt_params, batch['text_lengths'])
+        stt_params = self._adjust_mean(stt_params, batch['text_lengths'], batch['mel_lengths'])
         stt_alignments = self._get_attention_matrix(self.hp, stt_params, torch.max(batch['mel_lengths']).item())
         stt_alignments = self._normalize(stt_alignments)
         
